@@ -189,23 +189,23 @@ public class Camera2BasicFragment extends Fragment
         @Override
         public void onOpened(@NonNull CameraDevice cameraDevice) {
             // This method is called when the camera is opened.  We start camera preview here.
-            mCameraOpenCloseLock.release();
-            mCameraDevice = cameraDevice;
-            createCameraPreviewSession();
+            mCameraOpenCloseLock.release();//释放锁
+            mCameraDevice = cameraDevice;//设备打开成功，保存该设备到全局
+            createCameraPreviewSession();//获取预览会话
         }
 
         @Override
         public void onDisconnected(@NonNull CameraDevice cameraDevice) {
             mCameraOpenCloseLock.release();
             cameraDevice.close();
-            mCameraDevice = null;
+            mCameraDevice = null;//清空全局
         }
 
         @Override
         public void onError(@NonNull CameraDevice cameraDevice, int error) {
             mCameraOpenCloseLock.release();
             cameraDevice.close();
-            mCameraDevice = null;
+            mCameraDevice = null;//清空全局设备
             Activity activity = getActivity();
             if (null != activity) {
                 activity.finish();
@@ -297,7 +297,7 @@ public class Camera2BasicFragment extends Fragment
                     if (afState == null) {
                         captureStillPicture();
                     } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
-                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
+                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {//聚焦失败成功无所谓，只要锁定
                         // CONTROL_AE_STATE can be null on some devices
                         Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
                         if (aeState == null ||
@@ -434,29 +434,29 @@ public class Camera2BasicFragment extends Fragment
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
+        mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");//获取照片文件
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        startBackgroundThread();
+        startBackgroundThread();//创建handler线程，用于一些非主线程任务
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
         if (mTextureView.isAvailable()) {
-            openCamera(mTextureView.getWidth(), mTextureView.getHeight());
+            openCamera(mTextureView.getWidth(), mTextureView.getHeight());//非第一次执行onResume
         } else {
-            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);//第一次执行onResume
         }
     }
 
     @Override
     public void onPause() {
-        closeCamera();
-        stopBackgroundThread();
+        closeCamera();//关闭并释放摄像头资源
+        stopBackgroundThread();//销毁handler线程
         super.onPause();
     }
 
@@ -490,40 +490,40 @@ public class Camera2BasicFragment extends Fragment
     @SuppressWarnings("SuspiciousNameCombination")
     private void setUpCameraOutputs(int width, int height) {
         Activity activity = getActivity();
-        CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+        CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);//获取摄像头管理对象
         try {
-            for (String cameraId : manager.getCameraIdList()) {
+            for (String cameraId : manager.getCameraIdList()) {//遍历摄像头列表（有多个摄像头）
                 CameraCharacteristics characteristics
-                        = manager.getCameraCharacteristics(cameraId);
+                        = manager.getCameraCharacteristics(cameraId);//获取摄像头特性
 
                 // We don't use a front facing camera in this sample.
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {//不使用前置摄像头，所以跳过
                     continue;
                 }
 
                 StreamConfigurationMap map = characteristics.get(
-                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+                        CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);//获取该摄像头的配置信息
                 if (map == null) {
                     continue;
                 }
 
-                // For still image captures, we use the largest available size.
+                // For still image captures, we use the largest available size. //找出可拍摄的最大值
                 Size largest = Collections.max(
-                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
-                        new CompareSizesByArea());
+                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),//获取能够拍摄的照片大小列表
+                        new CompareSizesByArea());//比较器
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                        ImageFormat.JPEG, /*maxImages*/2);
+                        ImageFormat.JPEG, /*maxImages*/2);//读图器
                 mImageReader.setOnImageAvailableListener(
-                        mOnImageAvailableListener, mBackgroundHandler);
+                        mOnImageAvailableListener, mBackgroundHandler/*监听器运行的目标线程*/);//设置有可读图片监听器
 
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
-                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();
+                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取屏幕旋转角度
                 //noinspection ConstantConditions
-                mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);//获取当前相机方向
                 boolean swappedDimensions = false;
-                switch (displayRotation) {
+                switch (displayRotation) {//屏幕旋转角度只有0，180，90，和270 四个角度
                     case Surface.ROTATION_0:
                     case Surface.ROTATION_180:
                         if (mSensorOrientation == 90 || mSensorOrientation == 270) {
@@ -547,7 +547,7 @@ public class Camera2BasicFragment extends Fragment
                 int maxPreviewWidth = displaySize.x;
                 int maxPreviewHeight = displaySize.y;
 
-                if (swappedDimensions) {
+                if (swappedDimensions) {//交换宽高值
                     rotatedPreviewWidth = height;
                     rotatedPreviewHeight = width;
                     maxPreviewWidth = displaySize.y;
@@ -567,11 +567,11 @@ public class Camera2BasicFragment extends Fragment
                 // garbage capture data.
                 mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                         rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight, largest);
+                        maxPreviewHeight, largest);//优化宽高比
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
                 int orientation = getResources().getConfiguration().orientation;
-                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {//设置宽高比
                     mTextureView.setAspectRatio(
                             mPreviewSize.getWidth(), mPreviewSize.getHeight());
                 } else {
@@ -583,7 +583,7 @@ public class Camera2BasicFragment extends Fragment
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 mFlashSupported = available == null ? false : available;
 
-                mCameraId = cameraId;
+                mCameraId = cameraId;//找到目标摄像头id，保存到全局变量
                 return;
             }
         } catch (CameraAccessException e) {
@@ -601,16 +601,16 @@ public class Camera2BasicFragment extends Fragment
      */
     private void openCamera(int width, int height) {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
+                != PackageManager.PERMISSION_GRANTED) {//权限检查
             requestCameraPermission();
             return;
         }
-        setUpCameraOutputs(width, height);
-        configureTransform(width, height);
+        setUpCameraOutputs(width, height);//设置摄像头输出宽高
+        configureTransform(width, height);//如果有必要，完成旋转，放缩，平移
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
-            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {//防止频繁操作，设备还没有回调返回，就进行下一次调用
                 throw new RuntimeException("Time out waiting to lock camera opening.");
             }
             manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
@@ -756,8 +756,10 @@ public class Camera2BasicFragment extends Fragment
                     (float) viewWidth / mPreviewSize.getWidth());
             matrix.postScale(scale, scale, centerX, centerY);
             matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+            Log.d("rotate","degree = "+180 * (rotation - 2));
         } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180, centerX, centerY);
+            Log.d("rotate","degree = 180");
         }
         mTextureView.setTransform(matrix);
     }
@@ -776,11 +778,11 @@ public class Camera2BasicFragment extends Fragment
         try {
             // This is how to tell the camera to lock focus.
             mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_START);
+                    CameraMetadata.CONTROL_AF_TRIGGER_START);//自动聚焦
             // Tell #mCaptureCallback to wait for the lock.
-            mState = STATE_WAITING_LOCK;
+            mState = STATE_WAITING_LOCK;//正在聚焦中，锁定目标
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
+                    mBackgroundHandler);//发送聚焦请求
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
